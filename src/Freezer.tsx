@@ -164,6 +164,40 @@ const HANDLE_GEO: THREE.BufferGeometry = (() => {
 // ── Attachment pad: flat disc pressed against the outer side wall ─────────────
 const HANDLE_PAD_GEO = new THREE.CylinderGeometry(0.42, 0.42, 0.22, 14)
 
+// ── Sheet-metal flat-pattern geometries ───────────────────────────────────────
+// Slant height: measured along the inclined side wall (draft angle ≈2.7°)
+const ICE_SH = Math.sqrt(ICE_H ** 2 + ((ICE_D_TOP - ICE_D_BOT) / 2) ** 2)
+
+// Perimeter of the rounded-rect cross-section at each level:  2*(D+W) - 8r + 2πr
+const ICE_P_BOT = 2*(ICE_D_BOT + ICE_W_BOT) - 8*ICE_C_BOT + 2*Math.PI*ICE_C_BOT
+const ICE_P_TOP = 2*(ICE_D_TOP + ICE_W_TOP) - 8*ICE_C_TOP + 2*Math.PI*ICE_C_TOP
+
+// Bottom plate: rounded rectangle in XY, centred at origin
+const SHEET_BOT_GEO = (() => {
+  const w = ICE_D_BOT / 2, h = ICE_W_BOT / 2, r = ICE_C_BOT
+  const s = new THREE.Shape()
+  s.moveTo(-w + r, -h)
+  s.lineTo(w - r, -h);  s.quadraticCurveTo(w, -h, w, -h + r)
+  s.lineTo(w, h - r);   s.quadraticCurveTo(w, h, w - r, h)
+  s.lineTo(-w + r, h);  s.quadraticCurveTo(-w, h, -w, h - r)
+  s.lineTo(-w, -h + r); s.quadraticCurveTo(-w, -h, -w + r, -h)
+  return new THREE.ShapeGeometry(s, 12)
+})()
+const SHEET_BOT_EDGES = new THREE.EdgesGeometry(SHEET_BOT_GEO)
+
+// Wrap-around side sheet: one piece that rolls to form all four walls + corners.
+// Width = full perimeter at that level; height = slant height ICE_SH.
+// Shape is centred at origin so the group-centre stays in the middle of the panel.
+const SHEET_WRAP_GEO = (() => {
+  const bw = ICE_P_BOT / 2, tw = ICE_P_TOP / 2, h = ICE_SH / 2
+  const s = new THREE.Shape()
+  s.moveTo(-bw, -h); s.lineTo(bw, -h)   // narrow end (bottom of container)
+  s.lineTo(tw,   h); s.lineTo(-tw,  h)  // wide end (top of container)
+  s.closePath()
+  return new THREE.ShapeGeometry(s)
+})()
+const SHEET_WRAP_EDGES = new THREE.EdgesGeometry(SHEET_WRAP_GEO)
+
 // ── Dimension-line style ───────────────────────────────────────────────────────
 const DIM_COL = '#f5cc30'
 const CONE_R  = 0.22
@@ -440,6 +474,7 @@ function IceContainers() {
 // ── Standalone container with dimension callouts ───────────────────────────────
 function StandaloneContainer() {
   const px     = -(W / 2 + 20)      // chord x: well clear of the freezer left wall
+  const py     = 6                   // lift off the ground so bottom labels are visible
   const pz     = 0
   const tipTop = px + ICE_D_TOP      // top arc-tip x
   const tipBot = px + ICE_D_BOT      // bottom arc-tip x
@@ -448,39 +483,120 @@ function StandaloneContainer() {
 
   return (
     <group>
-      <IceContainer x={px} y={0} z={pz} facing="left" />
+      <IceContainer x={px} y={py} z={pz} facing="left" />
 
       {/* ── Top dimensions ── */}
       <DimLine
-        start={[tipTop + 3, ICE_H + 1, pz - hwTop]}
-        end={  [tipTop + 3, ICE_H + 1, pz + hwTop]}
+        start={[tipTop + 3, py + ICE_H + 1, pz - hwTop]}
+        end={  [tipTop + 3, py + ICE_H + 1, pz + hwTop]}
         label={`${ICE_W_TOP} in`}
       />
       <DimLine
-        start={[px,     ICE_H + 1, pz - hwTop - 3]}
-        end={  [tipTop, ICE_H + 1, pz - hwTop - 3]}
+        start={[px,     py + ICE_H + 1, pz - hwTop - 3]}
+        end={  [tipTop, py + ICE_H + 1, pz - hwTop - 3]}
         label={`${ICE_D_TOP} in`}
       />
 
       {/* ── Bottom dimensions ── */}
       <DimLine
-        start={[tipBot + 3, -2, pz - hwBot]}
-        end={  [tipBot + 3, -2, pz + hwBot]}
+        start={[tipBot + 3, py - 2, pz - hwBot]}
+        end={  [tipBot + 3, py - 2, pz + hwBot]}
         label={`${ICE_W_BOT} in`}
       />
       <DimLine
-        start={[px,     -2, pz - hwBot - 3]}
-        end={  [tipBot, -2, pz - hwBot - 3]}
+        start={[px,     py - 2, pz - hwBot - 3]}
+        end={  [tipBot, py - 2, pz - hwBot - 3]}
         label={`${ICE_D_BOT} in`}
       />
 
       {/* ── Height ── */}
       <DimLine
-        start={[tipTop + 3, 0,      pz + hwTop + 3]}
-        end={  [tipTop + 3, ICE_H,  pz + hwTop + 3]}
+        start={[tipTop + 3, py,          pz + hwTop + 3]}
+        end={  [tipTop + 3, py + ICE_H,  pz + hwTop + 3]}
         label={`${ICE_H} in`}
       />
     </group>
+  )
+}
+
+// ── Sheet Metal Flat Patterns ─────────────────────────────────────────────────
+// Two pieces:
+//  1. Wrap sheet — one continuous trapezoid that rolls around the perimeter
+//     to form all four walls (seam on one flat side). Width = full perimeter at each level.
+//  2. Bottom plate — the rounded-rectangle base.
+function SheetMetalPatterns() {
+  const CX        = W / 2 + ICE_P_BOT / 2 + 6   // left edge of wrap sheet ≈ 26" from centre
+  const CZ        = 0
+  const botOffset = ICE_P_TOP / 2 + 4 + ICE_D_BOT / 2  // gap = 4"
+
+  const face = (
+    <meshStandardMaterial color="#d8e4ea" roughness={0.52} metalness={0.28} side={THREE.DoubleSide} />
+  )
+  const edge = <lineBasicMaterial color="#7ab8d0" />
+
+  return (
+    <>
+      <pointLight position={[CX + botOffset / 2, ICE_SH / 2, 15]} intensity={7} color="#e8eeff" distance={90} decay={1.1} />
+
+      <Billboard position={[CX + botOffset / 2, ICE_SH + 5, CZ]}>
+        <Text fontSize={1.8} color="#ffdd88" anchorX="center" anchorY="bottom">
+          Sheet Metal Flat Patterns
+        </Text>
+      </Billboard>
+
+      {/* No rotation — ShapeGeometry lives in XY plane, face normal = +Z toward camera */}
+      <group position={[CX, 0, CZ]}>
+
+        {/* ── Wrap-around side sheet ── centred shape lifted so narrow bottom sits at y=0 */}
+        <mesh geometry={SHEET_WRAP_GEO} position={[0, ICE_SH / 2, 0]}>{face}</mesh>
+        <lineSegments geometry={SHEET_WRAP_EDGES} position={[0, ICE_SH / 2, 0]}>{edge}</lineSegments>
+        <Billboard position={[0, ICE_SH / 2, 0.3]}>
+          <Text fontSize={1.05} color="#e8f0ff" textAlign="center"
+                outlineWidth={0.04} outlineColor="#111">
+            {`Side Sheet ×1\nRoll & seam to form all walls\n${ICE_P_BOT.toFixed(2)}"→${ICE_P_TOP.toFixed(2)}" wide · ${ICE_H}" tall`}
+          </Text>
+        </Billboard>
+
+        {/* ── Bottom plate ── centred shape lifted so bottom sits at y=0 */}
+        <mesh geometry={SHEET_BOT_GEO} position={[botOffset, ICE_D_BOT / 2, 0]}>{face}</mesh>
+        <lineSegments geometry={SHEET_BOT_EDGES} position={[botOffset, ICE_D_BOT / 2, 0]}>{edge}</lineSegments>
+        <Billboard position={[botOffset, ICE_D_BOT / 2, 0.3]}>
+          <Text fontSize={1.05} color="#e8f0ff" textAlign="center"
+                outlineWidth={0.04} outlineColor="#111">
+            {`Bottom Plate ×1\n${ICE_D_BOT}"×${ICE_W_BOT}"\nr = ${ICE_C_BOT}"`}
+          </Text>
+        </Billboard>
+      </group>
+
+      {/* Dimension callouts — wrap sheet (narrow bottom at y=0, wide top at y=ICE_SH) */}
+      <DimLine
+        start={[CX - ICE_P_BOT / 2,     0.5,          CZ + 2]}
+        end={  [CX + ICE_P_BOT / 2,     0.5,          CZ + 2]}
+        label={`${ICE_P_BOT.toFixed(2)} in`}
+      />
+      <DimLine
+        start={[CX - ICE_P_TOP / 2,     ICE_SH + 2,   CZ + 2]}
+        end={  [CX + ICE_P_TOP / 2,     ICE_SH + 2,   CZ + 2]}
+        label={`${ICE_P_TOP.toFixed(2)} in`}
+      />
+      <DimLine
+        start={[CX + ICE_P_TOP / 2 + 3, 0,            CZ + 2]}
+        end={  [CX + ICE_P_TOP / 2 + 3, ICE_SH,       CZ + 2]}
+        label={`${ICE_SH.toFixed(2)} in`}
+      />
+
+      {/* Dimension callouts — bottom plate (y from 0 to ICE_W_BOT) */}
+      <DimLine
+        start={[CX + botOffset - ICE_D_BOT / 2,     0.5,       CZ + 2]}
+        end={  [CX + botOffset + ICE_D_BOT / 2,     0.5,       CZ + 2]}
+        label={`${ICE_D_BOT} in`}
+      />
+      <DimLine
+        start={[CX + botOffset + ICE_D_BOT / 2 + 2, 0,         CZ + 2]}
+        end={  [CX + botOffset + ICE_D_BOT / 2 + 2, ICE_W_BOT, CZ + 2]}
+        label={`${ICE_W_BOT} in`}
+      />
+    </>
   )
 }
 
@@ -674,6 +790,7 @@ export default function Freezer({ onLidToggle }: FreezerProps) {
       <ControlPanel />
       <Dimensions />
       <StandaloneContainer />
+      <SheetMetalPatterns />
 
       <Box pos={[2.5, LG + H - 2, Ln / 2 + 0.18]} size={[W - 9, 0.8, 0.25]} mat={ACCENT} shadow={false} />
 

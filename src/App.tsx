@@ -44,11 +44,11 @@ export default function App() {
     <div className="app">
       <Canvas
         shadows={{ type: PCFSoftShadowMap }}
-        camera={{ position: [28, 68, 38], fov: 45, near: 0.1, far: 1000 }}
+        camera={{ position: [-5, 90, 50], fov: 55, near: 0.1, far: 1000 }}
         gl={{ antialias: true, toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
       >
         <color attach="background" args={['#0f0f1a']} />
-        <fogExp2 attach="fog" args={['#0f0f1a', 0.007]} />
+        <fogExp2 attach="fog" args={['#0f0f1a', 0.005]} />
 
         <ambientLight color="#aab0cc" intensity={0.7} />
 
@@ -73,7 +73,9 @@ export default function App() {
           minDistance={25}
           maxDistance={180}
           maxPolarAngle={Math.PI * 0.84}
-          target={[0, 13, 0]}
+          target={[0, 10, 0]}
+          enablePan
+          screenSpacePanning
         />
 
         <Ground />
@@ -82,7 +84,7 @@ export default function App() {
 
       <div className="ui">
         <h1>Deep Freezer Prototype</h1>
-        <p>Click lid to open / close &nbsp;·&nbsp; Drag to orbit &nbsp;·&nbsp; Scroll to zoom</p>
+        <p>Click lid to open / close &nbsp;·&nbsp; Left-drag to orbit &nbsp;·&nbsp; Right-drag to pan &nbsp;·&nbsp; Scroll to zoom</p>
       </div>
 
       <div className="dims">
