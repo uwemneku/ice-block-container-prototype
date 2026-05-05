@@ -1,0 +1,58 @@
+.app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+.ui {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #d0d8f8;
+  text-align: center;
+  pointer-events: none;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+.ui h1 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+.ui p {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-top: 7px;
+}
+
+.dims {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  color: #5566aa;
+  font-size: 12px;
+  font-family: monospace;
+  line-height: 2;
+  pointer-events: none;
+}
+
+.status {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  color: #88aadd;
+  font-size: 13px;
+  font-family: monospace;
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.status.show {
+  opacity: 1;
+}
